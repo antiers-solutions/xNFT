@@ -25,26 +25,10 @@ This repository contains the source code of **Trappist**, a feature-rich paracha
 
 All these pre-configured to allow cross-chain communication via XCM messages on HRMP channels.
 
-![Trappist topology](/docs/media/trappist-topology.png)
-
-### Why "Trappist" ?
-
-The term **Trappist** refers to a [style of beers](https://en.wikipedia.org/wiki/Trappist_beer) brewed in Abbeys by Trappist monks, and is generally associated with authenticity, craftsmanship, integrity and tradition. Aside from any religious consideration, we like to think we put as much care in crafting Blockchain software as monks brewing high-quality beer 🍺.
-
-As Trappist breweries are not intended to be profit-making ventures, this project is non-commercial, open-source software focused solely on experimentation and knowledge sharing with people interested in learning about decentralized technologies.
-
 ## Getting Started
 
 Follow the steps below to get started.
 
-### Build Trappist collator
-
-#### Using Nix
-
-Install [nix](https://nixos.org/) and optionally [direnv](https://github.com/direnv/direnv) and
-[lorri](https://github.com/target/lorri) for a fully plug and play experience for setting up the
-development environment. To get all the correct dependencies activate direnv `direnv allow` and
-lorri `lorri shell`.
 
 #### Rust Setup
 
@@ -61,46 +45,29 @@ cargo build --release
 
 ### XCM Playground via Zombienet
 
-Create a `bin` directory into the root of this repository and place the following binaries inside of it:
-- `polkadot` (which you can download from [the releases](https://github.com/paritytech/polkadot/releases))
-- a binary file will be created when you build this repository and this file will be used for running the blockchain.
+Create a `Binaries` folder into the root of this repository and place the following binaries inside of it:
+- `polkadot` (which you can download from [the drive](https://drive.google.com/file/d/1nu02QoODHpLLMAAVL24uhW5tqBR_kBId/view?usp=sharing))
+- `parachain-template-node` (which you can download from [the drive](https://drive.google.com/file/d/1nu02QoODHpLLMAAVL24uhW5tqBR_kBId/view?usp=sharing))
+- `zombienet-macos` (which you can download from [the drive](https://drive.google.com/file/d/1nu02QoODHpLLMAAVL24uhW5tqBR_kBId/view?usp=sharing))
 
-Download the [latest release of zombienet](https://github.com/paritytech/zombienet/releases/) into the root of this repository and make it executable:
+
+make all the binaries executable:
 ```bash
-$ chmod +x zombienet-linux # OR
 $ chmod +x zombienet-macos
+$ chmod +x polkadot
+$ chmod +x parachain-template-node
 ```
 
 Then, start the **Trappist** playground with:
 ```bash
-./zombienet-linux -p native spawn ./zombienet/trappist_rococo.toml
+cd Binaries
+./zombienet-macos -p native spawn .././zombienet/trappist_rococo.toml
 ```
-You can also run:
-```bash
-# To start Trappist and Stout together
-./zombienet-linux -p native spawn ./zombienet/full_network.toml
-# To only run stout
-./zombienet-linux -p native spawn ./zombienet/stout_rococo.toml
-```
-- Before testing transfer funds to the Sovereign accounts of Parachains:
-1. ParaID 3000: 5Eg2fntDDP4P8TjqRg3Jq89y5boE26JUMM3D7VU3bCAp76nc
+
+- Before testing transfer funds to the Sibling accounts of Parachains:
+1. ParaID 1000: 5Eg2fntNprdN3FgH4sfEaaZhYtddZQSQUqvYJ1f2mLtinVhV
 2. ParaID 1836: 5Eg2fnsjAAr8RGZfa8Sy5mYFPabA9ZLNGYECCKXPD6xnK6D2
 
-### Integration Tests
-[parachains-integration-tests](https://github.com/paritytech/parachains-integration-tests) is a tool meant for XCM message execution in a locally spawned network. Tests are written as YAML files and converted into [Mocha](https://mochajs.org/) tests with [Chai](https://www.chaijs.com/) assertions.
-
-The [integration-tests](./integration-tests) directory has tests on Trappist use cases and instructions on how to run them.
-
-### XCM Simulator
-The [XCM simulator](./xcm-simulator) can be used to further explore XCM message execution across the various runtimes used by Trappist.
-Each Trappist use case is written as a Rust unit test, allowing interactive debugging/exploration of message flows and instruction execution.
-Each `execute_with` closure scope within a test can be considered as a block on the corresponding chain, with messages being dispatched to the destination chains via a mock message queue as the closure goes out of scope.
-All XCM-specific traces from the interactions are also collected in a single place for easier inspection.
-
-You can run all tests with:
-```
-cd xcm-simulator && cargo test --release tests::; cd ..
-```
 
 ## License
 Trappist is licensed under [Apache 2](LICENSE).
