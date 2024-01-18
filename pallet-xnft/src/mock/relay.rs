@@ -4,26 +4,31 @@ use crate::{
 	test::relay::currency::{CENTS, MILLICENTS},
 };
 use cumulus_primitives_core::relay_chain::CandidateHash;
-use frame_support::{ traits::AsEnsureOriginWithArg};
+use frame_support::{assert_ok, traits::AsEnsureOriginWithArg};
 use polkadot_runtime_common::{
 	paras_sudo_wrapper,
 	xcm_sender::{ChildParachainRouter, ExponentialPrice},
 };
 pub use polkadot_runtime_parachains::hrmp;
 use polkadot_runtime_parachains::{
-	dmp as parachains_dmp, 
+	dmp as parachains_dmp, paras::ParaGenesisArgs, schedule_para_initialize,
 };
 
+use crate::test::*;
 use frame_support::{
 	construct_runtime,
+	dispatch::DispatchClass,
+	pallet_prelude::{DispatchResult, Get},
 	parameter_types,
 	traits::{
-		 ConstU32, ConstU64,  Everything, GenesisBuild, Nothing,
+		ConstU128, ConstU16, ConstU32, ConstU64, Currency, Everything, GenesisBuild, Nothing,
 		ProcessMessage, ProcessMessageError,
 	},
-	weights::{ Weight, WeightMeter},
-	
+	weights::{constants::RocksDbWeight, IdentityFee, Weight, WeightMeter},
+	RuntimeDebug,
 };
+use polkadot_parachain::primitives::ValidationCode;
+use sp_runtime::traits::AccountIdConversion;
 
 use crate::test::relay::currency::DOLLARS;
 use cumulus_primitives_core::{
@@ -31,7 +36,7 @@ use cumulus_primitives_core::{
 	ChannelStatus, GetChannelInfo, ParaId,
 };
 use frame_support::traits::ValidatorSetWithIdentification;
-use frame_system::{EnsureRoot};
+use frame_system::{EnsureRoot, EnsureRootWithSuccess, EnsureSigned};
 use sp_runtime::{transaction_validity::TransactionPriority, Permill};
 use std::{cell::RefCell, collections::HashMap};
 pub mod currency {
@@ -47,8 +52,9 @@ pub mod currency {
 }
 use sp_runtime::{
 	generic,
-	traits::{ BlakeTwo256, IdentityLookup},
-	 MultiSignature,
+	testing::Header,
+	traits::{AccountIdLookup, BlakeTwo256, IdentityLookup},
+	BoundedVec, DispatchError, MultiSignature,
 };
 pub type Signature = MultiSignature;
 pub type AccountPublic = <Signature as sp_runtime::traits::Verify>::Signer;
@@ -57,7 +63,6 @@ use crate::test::para::ParachainInfo;
 use frame_support::traits::ValidatorSet;
 use sp_core::H256;
 use xcm_builder::{EnsureXcmOrigin, NativeAsset};
-//pub type AccountId = u64;
 use pallet_nfts::PalletFeatures;
 use polkadot_runtime_parachains::{disputes, inclusion, paras, scheduler, session_info};
 
@@ -70,15 +75,15 @@ pub type BlockNumber = u32;
 pub type Index = u32;
 use xcm::v3::prelude::*;
 use xcm_builder::{
-	 AllowTopLevelPaidExecutionFrom, 
-	ChildParachainConvertsVia, FixedWeightBounds,
-	  SignedToAccountId32,
-	TakeWeightCredit,
+	AccountId32Aliases, AllowTopLevelPaidExecutionFrom, ChildParachainAsNative,
+	ChildParachainConvertsVia, CurrencyAdapter as XcmCurrencyAdapter, FixedWeightBounds,
+	IsConcrete, SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation,
+	TakeWeightCredit, UsingComponents,
 };
 use xcm_executor::XcmExecutor;
 
 type Origin = <Test as frame_system::Config>::RuntimeOrigin;
-
+use crate::Config;
 
 type Balance = u128;
 
@@ -196,7 +201,6 @@ parameter_types! {
 
 impl pallet_nfts::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
 	type CollectionId = u32;
 	type ItemId = u32;
 	type Currency = Balances;
@@ -666,3 +670,31 @@ pub struct MockGenesisConfig {
 	pub paras: paras::GenesisConfig,
 }
 
+pub fn sudo_establish_hrmp_channel(
+	sender: ParaId,
+	recipient: ParaId,
+	max_capacity: u32,
+	max_message_size: u32,
+) -> DispatchResult {
+	Hrmp::init_open_channel(sender, recipient, max_capacity, max_message_size);
+	Hrmp::accept_open_channel(recipient, sender);
+	Ok(())
+}
+
+pub(crate) fn register_parachain_with_balance(id: ParaId, balance: Balance) {
+	let validation_code: ValidationCode = vec![1].into();
+	assert_ok!(schedule_para_initialize::<Test>(
+		id,
+		paras::ParaGenesisArgs {
+			para_kind: paras::ParaKind::Parachain,
+			genesis_head: vec![1].into(),
+			validation_code: validation_code.clone(),
+		},
+	));
+
+	assert_ok!(Paras::add_trusted_validation_code(RuntimeOrigin::root(), validation_code));
+	<Test as hrmp::Config>::Currency::make_free_balance_be(
+		&id.into_account_truncating(),
+		balance.try_into().unwrap(),
+	);
+}

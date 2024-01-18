@@ -1,16 +1,17 @@
 #![cfg(test)]
 
 use super::*;
+use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_io::TestExternalities;
-use sp_runtime::{ AccountId32  };
+use sp_runtime::{AccountId32, BoundedVec};
 pub mod para;
 pub mod relay;
 use crate as xnft;
 use frame_support::traits::GenesisBuild;
-use xcm_simulator::{ decl_test_network, decl_test_parachain, decl_test_relay_chain, TestExt };
+use xcm_simulator::{decl_test_network, decl_test_parachain, decl_test_relay_chain, TestExt};
 
 pub const ALICE: AccountId32 = AccountId32::new([0u8; 32]);
-//pub const ALICE: u64 = 1_000_000_000;
 pub const INITIAL_BALANCE: u64 = 1_000_000_000;
 pub const BOB: AccountId32 = AccountId32::new([1u8; 32]);
 pub const CHARLIE: AccountId32 = AccountId32::new([1u8; 32]);
@@ -62,46 +63,50 @@ pub type RelayBalances = pallet_balances::Pallet<relay::Test>;
 pub type ParaChain1 = xnft::Pallet<para::Test>;
 pub type NFT = pallet_nfts::Pallet<para::Test>;
 pub fn para_ext(para_id: u32) -> TestExternalities {
-    use para::{ System, Test };
+	use para::{System, Test};
 
-    let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
-    let parachain_info_config = parachain_info::GenesisConfig { parachain_id: para_id.into() };
-    <parachain_info::GenesisConfig as GenesisBuild<Test, _>>
-        ::assimilate_storage(&parachain_info_config, &mut t)
-        .unwrap();
+	let parachain_info_config = parachain_info::GenesisConfig { parachain_id: para_id.into() };
+	<parachain_info::GenesisConfig as GenesisBuild<Test, _>>::assimilate_storage(
+		&parachain_info_config,
+		&mut t,
+	)
+	.unwrap();
 
-    let mut ext = TestExternalities::new(t);
-    ext.execute_with(|| System::set_block_number(1));
-    ext
+	let mut ext = TestExternalities::new(t);
+	ext.execute_with(|| System::set_block_number(1));
+	ext
 }
 
 pub fn para_teleport_ext(para_id: u32) -> TestExternalities {
-    use para::{ System, Test };
+	use para::{System, Test};
 
-    let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
-    let parachain_info_config = parachain_info::GenesisConfig { parachain_id: para_id.into() };
-    <parachain_info::GenesisConfig as GenesisBuild<Test, _>>
-        ::assimilate_storage(&parachain_info_config, &mut t)
-        .unwrap();
+	let parachain_info_config = parachain_info::GenesisConfig { parachain_id: para_id.into() };
+	<parachain_info::GenesisConfig as GenesisBuild<Test, _>>::assimilate_storage(
+		&parachain_info_config,
+		&mut t,
+	)
+	.unwrap();
 
-    let mut ext = TestExternalities::new(t);
-    ext.execute_with(|| System::set_block_number(1));
-    ext
+	let mut ext = TestExternalities::new(t);
+	ext.execute_with(|| System::set_block_number(1));
+	ext
 }
 
 
 pub fn relay_ext() -> sp_io::TestExternalities {
-    use relay::{ System, Test };
+	use relay::{System, Test};
 
-    let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
-    (pallet_balances::GenesisConfig::<Test> { balances: vec![(ALICE, INITIAL_BALANCE)] })
-        .assimilate_storage(&mut t)
-        .unwrap();
+	pallet_balances::GenesisConfig::<Test> { balances: vec![(ALICE, INITIAL_BALANCE)] }
+		.assimilate_storage(&mut t)
+		.unwrap();
 
-    let mut ext = sp_io::TestExternalities::new(t);
-    ext.execute_with(|| System::set_block_number(1));
-    ext
+	let mut ext = sp_io::TestExternalities::new(t);
+	ext.execute_with(|| System::set_block_number(1));
+	ext
 }

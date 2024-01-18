@@ -2,19 +2,23 @@
 use super::*;
 use crate::{
 	mock::relay::{
-		Test,
+		new_test_ext, Configuration, MockGenesisConfig, Paras, ParasShared,
+		RuntimeEvent as MockEvent, System, Test,
 	},
 	test::{
-		
+		hrmp::HrmpChannels,
 		para::RuntimeOrigin,
-		
+		relay::{hrmp, register_parachain_with_balance, BlockNumber},
 	},
 };
-
-use frame_support::{assert_noop, assert_ok,  traits::Currency};
+use cumulus_primitives_core::ParaId;
+use frame_support::{assert_noop, assert_ok, pallet_prelude::DispatchResult, traits::Currency};
+use frame_support_test::pallet_prelude::OriginFor;
+use mock::relay::Hrmp;
 pub use mock::*;
-use pallet_nfts::types::*;
-use polkadot_parachain::primitives::{ Sibling};
+//use pallet_nfts::types::*;
+use polkadot_parachain::primitives::{HrmpChannelId, Sibling};
+use polkadot_runtime_parachains::{hrmp as OtherModule, Origin};
 use sp_runtime::{traits::AccountIdConversion, AccountId32};
 use xcm_simulator::TestExt;
 
@@ -32,10 +36,10 @@ fn sibling_b_account() -> AccountId32 {
 	Sibling::from(2001).into_account_truncating()
 }
 fn collection_config_with_all_settings_enabled() -> CollectionConfigFor<Test> {
-	CollectionConfig {
-		settings: CollectionSettings::all_enabled(),
+	pallet_nfts::CollectionConfig {
+		settings: pallet_nfts::CollectionSettings::all_enabled(),
 		max_supply: None,
-		mint_settings: MintSettings::default(),
+		mint_settings: pallet_nfts::MintSettings::default(),
 	}
 }
 fn set_balance() {
@@ -53,7 +57,7 @@ struct TestSetup {
 	item_id: u32,
 	dest_item_id: u32,
 	sibling_account1: AccountId32,
-	sibling_account2: AccountId32
+	sibling_account2: AccountId32,
 }
 
 fn initialize_param() -> TestSetup {
@@ -66,12 +70,14 @@ fn initialize_param() -> TestSetup {
 		sibling_account2: sibling_a_account(),
 	}
 }
+
 struct MultiTestSetup {
 	collection_id: u32,
 	dest_collection_id: u32,
 	item_id: Vec<u32>,
 	dest_item_id: Vec<u32>,
 	sibling_account1: AccountId32,
+	sibling_account2: AccountId32,
 }
 
 fn multi_initialize_param() -> MultiTestSetup {
@@ -81,11 +87,12 @@ fn multi_initialize_param() -> MultiTestSetup {
 		item_id: vec![0, 1, 2],
 		dest_item_id: vec![0, 1, 2],
 		sibling_account1: sibling_a_account(),
+		sibling_account2: sibling_a_account(),
 	}
 }
 
 fn create() {
-	initialize_param();
+	let fetch = initialize_param();
 	Para1::execute_with(|| {
 		assert_ok!(NFT::create(
 			RuntimeOrigin::signed(ALICE),
@@ -374,6 +381,7 @@ fn multinft_transfer_works() {
 	TestNet::reset();
 	let fetch = initialize_param();
 	let multi_fetch = multi_initialize_param();
+	let owner = BOB;
 	let item_id_1 = 1;
 	let item_id_2 = 2;
 	set_balance();
@@ -412,6 +420,7 @@ fn multinft_transfer_fails_owner_mismatch() {
 	TestNet::reset();
 	let fetch = initialize_param();
 	let multi_fetch = multi_initialize_param();
+	let owner = BOB;
 	let item_id_1 = 1;
 	let item_id_2 = 2;
 	set_balance();
@@ -453,7 +462,7 @@ fn multinft_transfer_fails_for_nonexistent_collection_id() {
 	TestNet::reset();
 	let fetch = initialize_param();
 	let multi_fetch = multi_initialize_param();
-	
+	let owner = BOB;
 	let item_id_1 = 1;
 	let item_id_2 = 2;
 	let new_collection_id = 3;
@@ -496,6 +505,7 @@ fn multinft_transfer_fails_for_nonexistent_item_id() {
 	TestNet::reset();
 	let fetch = initialize_param();
 	let multi_fetch = multi_initialize_param();
+	let owner = BOB;
 	let item_id_1 = 1;
 	let item_id_2 = 2;
 	let new_item_id = vec![0, 1, 7];

@@ -1,19 +1,21 @@
 #![cfg(test)]
 use crate::{self as pallet_xnft};
+
+use crate::test::*;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use frame_support::{
 	construct_runtime, match_types,
-	pallet_prelude::{ Get},
+	pallet_prelude::{DispatchResult, Get},
 	parameter_types,
 	traits::{
-		AsEnsureOriginWithArg,  ConstU32, ConstU64, Everything,
-		
+		AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU64, Currency, Everything,
+		Nothing,
 	},
-	weights::constants::{ WEIGHT_REF_TIME_PER_SECOND},
+	weights::constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
 };
-use frame_system::{EnsureRoot};
+use frame_system::{EnsureRoot, EnsureRootWithSuccess, EnsureSigned};
 
-use sp_runtime::{generic};
+use sp_runtime::{generic, BoundedVec};
 pub use sp_runtime::{
 	testing::Header,
 	traits::{AccountIdLookup, BlakeTwo256, IdentityLookup},
@@ -22,10 +24,11 @@ pub use sp_runtime::{
 
 use crate::test::para::currency::DOLLARS;
 
-use sp_core::{H256};
+use sp_core::{H256, U256};
 
 pub type CollectionId = u64;
 type Origin = <Test as frame_system::Config>::RuntimeOrigin;
+use crate::Config;
 type Balance = u128;
 use cumulus_primitives_core::{ChannelStatus, GetChannelInfo, ParaId};
 use pallet_nfts::PalletFeatures;
@@ -162,7 +165,6 @@ parameter_types! {
 
 impl pallet_nfts::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
 	type CollectionId = u32;
 	type ItemId = u32;
 	type Currency = Balances;
@@ -361,7 +363,6 @@ impl pallet_xcm::Config for Test {
 
 parameter_types! {
 	pub SelfLocation: MultiLocation = MultiLocation::new(1, X1(Parachain(ParachainInfo::get().into())));
-	// pub const MaxAssetsForTransfer: usize = 3;
 }
 
 match_types! {

@@ -29,23 +29,34 @@
 pub mod mock;
 #[cfg(test)]
 pub mod test;
+
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
 use cumulus_pallet_xcm::Origin as CumulusOrigin;
 pub use pallet::*;
-pub use pallet_nfts::CollectionConfigFor;
-
-pub use pallet_nfts::{AccountIdLookupOf, Call::create, ItemDetails};
+pub use sp_runtime::traits::StaticLookup;
+pub use frame_support::traits::Currency;
+pub use pallet_nfts::{ Call::create, ItemDetails};
 use scale_info::prelude::{vec, vec::Vec};
-
+use frame_system::{
+	ensure_signed,
+	pallet_prelude::{BlockNumberFor, OriginFor},
+};
+type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 pub use xcm::prelude::*;
+pub type BalanceOf<T, I = ()> =
+	<<T as pallet_nfts::Config<I>>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+pub type CollectionConfigFor<T, I = ()> = pallet_nfts::CollectionConfig<
+	BalanceOf<T, I>, BlockNumberFor<T>,
+	<T as pallet_nfts::Config<I>>::CollectionId,
+>;
 
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::pallet_prelude::*;
-	use frame_system::{pallet_prelude::*, Config as SystemConfig};
+	use frame_support::{pallet_prelude::*, traits::tokens::nonfungibles_v2::Inspect};
+	use frame_system:: Config as SystemConfig;
 	use sp_runtime::DispatchResult;
 	/// The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -118,10 +129,11 @@ pub mod pallet {
 		/// How to send an onward XCM message.
 		type XcmSender: SendXcm;
 		/// The runtime `Call` type.
-		type RuntimeCall: From<Call<Self, I>> + Encode;
+		type RuntimeCall: From<pallet_nfts::Call<Self, I>> + Encode;
 		#[cfg(feature = "runtime-benchmarks")]
 		/// A set of helper functions for benchmarking.
 		type Helper: BenchmarkHelper<Self::CollectionId, Self::ItemId>;
+		
 	}
 
 	#[pallet::event]
@@ -216,6 +228,7 @@ pub mod pallet {
 		/// - `dest`: The destination chain to which collection is transferred.
 		///
 		/// Emits `CollectionTransferredSuccessfully`.
+		///
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::zero())]
 		pub fn collection_transfer(
@@ -224,24 +237,25 @@ pub mod pallet {
 			collection_id: T::CollectionId,
 			dest_collection_id: T::CollectionId,
 			dest: MultiLocation,
-			config: pallet_nfts::CollectionConfigFor<T,I>
+			config: CollectionConfigFor<T,I>
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 			ensure!(
 				pallet_nfts::Collection::<T, I>::contains_key(&collection_id),
 				Error::<T, I>::NoSuchCollectionId
 			);
-			let owner = pallet_nfts::Collection::<T, I>::get(collection_id).map(|a| a.owner);
+			//let owner = pallet_nfts::Collection::<T, I>::get(collection_id).map(|a| a.owner);
+			let owner = pallet_nfts::Pallet::<T,I>::collection_owner(collection_id);
 			ensure!(owner == Some(from), Error::<T, I>::NoTCollectionOwner);
 			CollectionMap::<T, I>::insert(dest_collection_id, collection_id);
 			let result = Self::do_transfer_collection(dest, sibling_account, config)?;
 
 			if result == true {
 				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(&collection_id) {
-					let collection_metadata =
-						pallet_nfts::CollectionMetadataOf::<T, I>::get(collection_id)
-							.map(|a| a.data)
-							.ok_or(Error::<T, I>::NotHavingMetadata)?;
+					let bounded =
+				     pallet_nfts::Pallet::<T,I>::collection_attribute(&collection_id, &[])
+						.ok_or(Error::<T, I>::NotHavingMetadata)?;
+                    let collection_metadata = BoundedVec::truncate_from(bounded);
 
 					let collection_result =
 						Self::do_set_collection_metadata(dest, collection_id, collection_metadata)?;
@@ -277,6 +291,8 @@ pub mod pallet {
 		/// - `mint_to_sibling`: The sibling account of sender parachain.
 		/// - `new_owner`: The new owner of item being sent at destination chain.
 		/// - `dest`: The destination chain to which item is transferred.
+		///
+
 		#[pallet::call_index(2)]
 		#[pallet::weight(Weight::zero())]
 		pub fn nft_transfer(
@@ -299,7 +315,8 @@ pub mod pallet {
 				pallet_nfts::Item::<T, I>::contains_key(&collection_id, &item_id),
 				Error::<T, I>::NoSuchItemId
 			);
-			let owner = pallet_nfts::Item::<T, I>::get(collection_id, item_id).map(|a| a.owner);
+			
+			let owner = pallet_nfts::Pallet::<T,I>::owner(collection_id, item_id);
 			ensure!(owner == Some(from), Error::<T, I>::NoTNftOwner);
 
 			let nft_result =
@@ -310,16 +327,15 @@ pub mod pallet {
 			}
 
 			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&collection_id, &item_id) {
-				let item_collection_metadata =
-					pallet_nfts::ItemMetadataOf::<T, I>::get(collection_id, item_id)
-						.map(|a| a.data)
-						.ok_or(Error::<T, I>::NotHavingMetadata);
-
+				let bounded =
+				pallet_nfts::Pallet::<T,I>::attribute(&collection_id, &item_id, &[])
+						.ok_or(Error::<T, I>::NotHavingMetadata)?;
+				let item_collection_metadata = BoundedVec::truncate_from(bounded);
 				let metadata_result = Self::do_set_nft_metadata(
 					dest,
 					dest_collection_id,
 					dest_item_id,
-					item_collection_metadata?,
+					item_collection_metadata,
 				)?;
 
 				if !metadata_result {
@@ -354,6 +370,8 @@ pub mod pallet {
 		/// - `collection_id`: The collection_id of collection at destination chain whose ownership is to be transferred.
 		/// - `new_owner`: The new owner of collection being sent at destination chain.
 		/// - `dest`: The destination chain to which collection is transferred.
+		///
+
 		#[pallet::call_index(3)]
 		#[pallet::weight(Weight::zero())]
 		pub fn transfer_collection_ownership(
@@ -364,15 +382,12 @@ pub mod pallet {
 		) -> DispatchResult {
 			let collection = CollectionMap::<T, I>::get(collection_id)
 				.ok_or(Error::<T, I>::NoSuchCollectionId)?;
-			let owner = pallet_nfts::Collection::<T, I>::get(collection)
-				.map(|a| a.owner)
-				.ok_or(Error::<T, I>::NotTheOwner)?;
+			let owner = pallet_nfts::Pallet::<T,I>::collection_owner(collection).ok_or(Error::<T, I>::NotTheOwner)?;
 			let orig = ensure_signed(origin.clone())?;
 			ensure!(owner == orig, Error::<T, I>::NoTCollectionOwner);
 			let result = Self::do_transfer_collection_ownership(dest, collection_id, new_owner);
 
 			if let Ok(true) = result {
-				CollectionMap::<T, I>::remove(collection_id);
 				return Ok(())
 			} else {
 				return Err(Error::<T, I>::CollectionOwnershipTransferringError.into())
@@ -392,6 +407,8 @@ pub mod pallet {
 		/// - `dest_item_id`: The item_id of new items at destination chain.
 		/// - `mint_to_sibling`: The sibling account of sender parachain.
 		/// - `dest`: The destination chain to which items are transferred.
+		///
+
 		#[pallet::call_index(4)]
 		#[pallet::weight(Weight::zero())]
 		pub fn transfer_multi_nfts(
@@ -416,8 +433,7 @@ pub mod pallet {
 					pallet_nfts::Item::<T, I>::contains_key(&collection_id, &i),
 					Error::<T, I>::NoSuchItemId
 				);
-
-				let owner = pallet_nfts::Item::<T, I>::get(collection_id, i).map(|a| a.owner);
+				let owner = pallet_nfts::Pallet::<T,I>::owner(collection_id, *i);
 				ensure!(owner == Some(from.clone()), Error::<T, I>::NoTNftOwner);
 			};
 
@@ -438,14 +454,13 @@ pub mod pallet {
 				AccountIds::<T, I>::insert((dest_collection_id,dest_i), from.clone());
 				ItemIdMap::<T, I>::insert((dest_collection_id, dest_i), i);
 				if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&collection_id, &i) {
-					let item_collection_metadata =
-						pallet_nfts::ItemMetadataOf::<T, I>::get(collection_id, i)
-							.map(|a| a.data)
-							.ok_or(Error::<T, I>::NotHavingMetadata);
-
+					let bounded =
+				     pallet_nfts::Pallet::<T,I>::attribute(&collection_id, &i, &[])
+						.ok_or(Error::<T, I>::NotHavingMetadata)?;
+                    let item_collection_metadata = BoundedVec::truncate_from(bounded);
 					ItemMetadataMap::<T, I>::insert(
 						(collection_id, dest_collection_id, i, dest_i),
-						item_collection_metadata?.clone(),
+						item_collection_metadata.clone(),
 					);
 				} else {
 					continue
@@ -469,6 +484,8 @@ pub mod pallet {
 		/// - `dest_item_id`: The item_id of item at destination chain whose ownership is to be transferred.
 		/// - `new_owner`: The new owner of item being sent at destination chain.
 		/// - `dest`: The destination chain to which item is transferred.
+		///
+
 		#[pallet::call_index(5)]
 		#[pallet::weight(Weight::zero())]
 		pub fn transfer_nfts_ownership(
@@ -482,13 +499,12 @@ pub mod pallet {
 
 			ensure!(dest_item_id.len() <= 3, Error::<T, I>::MaxItemCountExceeded);
 
-			 CollectionMap::<T, I>::get(dest_collection_id)
-				.ok_or(Error::<T, I>::NoSuchCollectionId)?;
+			CollectionMap::<T, I>::get(dest_collection_id).ok_or(Error::<T, I>::NoSuchCollectionId)?;
 
 			for dest_item_id in dest_item_id {
 				let owner = AccountIds::<T, I>::get((dest_collection_id,dest_item_id));
 				ensure!(owner == Some(who.clone()), Error::<T, I>::NotTheOwner);
-				ItemIdMap::<T, I>::get(&(dest_collection_id, dest_item_id))
+				 ItemIdMap::<T, I>::get(&(dest_collection_id, dest_item_id))
 					.ok_or(Error::<T, I>::NoSuchItemId)?;
 
 				let ownership_result = Self::do_transfer_nft_ownership(
@@ -517,6 +533,8 @@ pub mod pallet {
 		/// - `dest_collection_id`: The collection_id of collection at destination chain whose item's metadata is to be set.
 		/// - `dest_item_id`: The item_id of item at destination chain whose metadata is to be set.
 		/// - `dest`: The destination chain at which item metadata is set.
+		///
+
 		#[pallet::call_index(7)]
 		#[pallet::weight(Weight::zero())]
 		pub fn transfer_nft_metadata(
@@ -579,7 +597,7 @@ pub mod pallet {
 				Xcm(vec![Transact {
 					origin_kind: OriginKind::SovereignAccount,
 					require_weight_at_most: Weight::from_parts(1_000_001_000, 66_536),
-					call: <T as pallet_nfts::Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+					call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
 						T,
 						I,
 					>::set_metadata {
@@ -606,14 +624,14 @@ pub mod pallet {
 		pub fn do_transfer_collection(
 			dest: MultiLocation,
 			sibling_account: AccountIdLookupOf<T>,
-			config: pallet_nfts::CollectionConfigFor<T, I>,
+			config: CollectionConfigFor<T, I>,
 		) -> Result<bool, DispatchError> {
 			match send_xcm::<T::XcmSender>(
 				dest,
 				Xcm(vec![Transact {
 					origin_kind: OriginKind::SovereignAccount,
 					require_weight_at_most: Weight::from_parts(1_000_001_000, 66_536),
-					call: <T as pallet_nfts::Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+					call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
 						T,
 						I,
 					>::create {
@@ -646,7 +664,7 @@ pub mod pallet {
 				Xcm(vec![Transact {
 					origin_kind: OriginKind::SovereignAccount,
 					require_weight_at_most: Weight::from_parts(1_000_001_000, 66_536),
-					call: <T as pallet_nfts::Config<I>>::RuntimeCall::from(
+					call: <T as Config<I>>::RuntimeCall::from(
 						pallet_nfts::Call::<T, I>::set_collection_metadata {
 							collection: collection_id,
 							data:data.clone(),
@@ -679,7 +697,7 @@ pub mod pallet {
 				Xcm(vec![Transact {
 					origin_kind: OriginKind::SovereignAccount,
 					require_weight_at_most: Weight::from_parts(1_000_001_000, 66_536),
-					call: <T as pallet_nfts::Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+					call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
 						T,
 						I,
 					>::mint {
@@ -715,7 +733,7 @@ pub mod pallet {
 				Xcm(vec![Transact {
 					origin_kind: OriginKind::SovereignAccount,
 					require_weight_at_most: Weight::from_parts(1_000_001_000, 66_536),
-					call: <T as pallet_nfts::Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+					call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
 						T,
 						I,
 					>::transfer {
@@ -749,7 +767,7 @@ pub mod pallet {
 				Xcm(vec![Transact {
 					origin_kind: OriginKind::SovereignAccount,
 					require_weight_at_most: Weight::from_parts(1_000_001_000, 66_536),
-					call: <T as pallet_nfts::Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+					call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
 						T,
 						I,
 					>::transfer_ownership {
