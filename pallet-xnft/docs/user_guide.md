@@ -4,6 +4,7 @@ This guide includes steps for a user to leverage the xNFT pallet to transfer NFT
 ## Prerequisites
 1. Establish bidirectional HRMP channel between parchains through relay chain. For help, use [this](https://docs.substrate.io/reference/how-to-guides/parachains/add-hrmp-channels/) guide.
 2. Create a collection, and mint some NFTs using the [NFT Pallet](https://github.com/antiers-solutions/xNFT/tree/master/nfts).
+3. Sibling account(as per the ParaID) must have enough funds for paying fees and to lock some funds until NFT is transfered.
 
 ## Following are the steps that you will need to follow in order to use the xNFT functionality:-
 #### **COLLECTION TRANSFER**
