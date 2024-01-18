@@ -1,5 +1,6 @@
 # xNFT pallet
 Pallet for cross chain NFT transfer.
+version = release-polkadot-v1.1.0
 ## Overview
 The pallet contains the following features:-
 1. Transfers collection from parachain to parachian 
