@@ -5,7 +5,7 @@ Function calls to transfer multiple NFTs
 1. Create a collection using the NFT pallet.
 2. In the collection mint NFTs that you want to transfer.
 3. Open bidirectinal HRMP channel between source and target chains.
-4. Sovereign account must have enough funds for paying fees and to lock some funds until NFT is transfered.
+4. Sibling account(as per the ParaID) must have enough funds for paying fees and to lock some funds until NFT is transfered.
 
 ## Functions (in specific order)
 ### 1. Collection Transfer
