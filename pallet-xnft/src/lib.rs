@@ -315,8 +315,10 @@ pub mod pallet {
 				pallet_nfts::Item::<T, I>::contains_key(&collection_id, &item_id),
 				Error::<T, I>::NoSuchItemId
 			);
+			// let owner = pallet_nfts::Item::<T, I>::get(collection_id, item_id).map(|a| a.owner);
+			let owner = 	pallet_nfts::Pallet::<T,I>::owner(collection_id, item_id);
+		
 			
-			let owner = pallet_nfts::Pallet::<T,I>::owner(collection_id, item_id);
 			ensure!(owner == Some(from), Error::<T, I>::NoTNftOwner);
 
 			let nft_result =

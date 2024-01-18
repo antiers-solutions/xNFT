@@ -23,7 +23,7 @@ pub use sp_runtime::{
 };
 
 use crate::test::para::currency::DOLLARS;
-
+use sp_runtime::BuildStorage;
 use sp_core::{H256, U256};
 
 pub type CollectionId = u64;
@@ -86,7 +86,7 @@ construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsics,
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances,
 		ParachainInfo: parachain_info,
 		XcmpQueue: cumulus_pallet_xcmp_queue,
@@ -102,14 +102,12 @@ construct_runtime!(
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
-	//type Block = Block;
+	type Block = Block;
+	type Nonce = u64;
 	type BlockLength = ();
 	type RuntimeOrigin = RuntimeOrigin;
 	type RuntimeCall = RuntimeCall;
 	type Lookup = IdentityLookup<Self::AccountId>;
-	type Index = Index;
-	type BlockNumber = BlockNumber;
-	type Header = generic::Header<BlockNumber, BlakeTwo256>;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = AccountId;
@@ -207,8 +205,8 @@ impl pallet_balances::Config for Test {
 	type WeightInfo = ();
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
-	type HoldIdentifier = ();
 	type MaxHolds = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
 parameter_types! {
@@ -291,6 +289,8 @@ impl xcm_executor::Config for XcmConfig {
 	type UniversalAliases = Everything;
 	type CallDispatcher = RuntimeCall;
 	type SafeCallFilter = Everything;
+	type Aliasers = ();
+
 }
 
 pub struct ChannelInfo;
@@ -363,6 +363,7 @@ impl pallet_xcm::Config for Test {
 
 parameter_types! {
 	pub SelfLocation: MultiLocation = MultiLocation::new(1, X1(Parachain(ParachainInfo::get().into())));
+	// pub const MaxAssetsForTransfer: usize = 3;
 }
 
 match_types! {
@@ -392,7 +393,7 @@ impl pallet_xnft::Config for Test {
 	type Helper = ();
 }
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
 }
 pub struct ExtBuilder;
 
@@ -404,7 +405,7 @@ impl Default for ExtBuilder {
 
 impl ExtBuilder {
 	pub fn build(self) -> sp_io::TestExternalities {
-		let storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		let storage = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 		storage.into()
 	}
 }
