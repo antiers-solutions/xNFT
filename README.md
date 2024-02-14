@@ -46,14 +46,20 @@ cargo build --release
 ### XCM Playground via Zombienet
 
 Create a `Binaries` folder into the root of this repository and place the following binaries inside of it:
+For mac users
 - `polkadot` (which you can download from [the drive](https://drive.google.com/file/d/1nu02QoODHpLLMAAVL24uhW5tqBR_kBId/view?usp=sharing))
 - `parachain-template-node` (which you can download from [the drive](https://drive.google.com/file/d/1nu02QoODHpLLMAAVL24uhW5tqBR_kBId/view?usp=sharing))
 - `zombienet-macos` (which you can download from [the drive](https://drive.google.com/file/d/1nu02QoODHpLLMAAVL24uhW5tqBR_kBId/view?usp=sharing))
 
+For Linux users(Ubuntu 22.04)
+- `polkadot` (which you can download from [the drive](https://drive.google.com/drive/folders/1Y5tuClPb4bMreeKY_y7UED4ucaFnfZ8Y?usp=sharing))
+- `parachain-template-node` (which you can download from [the drive](https://drive.google.com/drive/folders/1Y5tuClPb4bMreeKY_y7UED4ucaFnfZ8Y?usp=sharing))
+- `zombienet-linux` (which you can download from [the drive](https://drive.google.com/drive/folders/1Y5tuClPb4bMreeKY_y7UED4ucaFnfZ8Y?usp=sharing))
+
 
 make all the binaries executable:
 ```bash
-$ chmod +x zombienet-macos
+$ chmod +x zombienet-macos or chmod +x zombienet-linux
 $ chmod +x polkadot
 $ chmod +x parachain-template-node
 ```
@@ -62,6 +68,8 @@ Then, start the **Trappist** playground with:
 ```bash
 cd Binaries
 ./zombienet-macos -p native spawn .././zombienet/trappist_rococo.toml
+ or
+./zombienet-linux -p native spawn .././zombienet/trappist_rococo.toml
 ```
 
 - Before testing transfer funds to the Sibling accounts of Parachains:
