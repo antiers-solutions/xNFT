@@ -14,9 +14,31 @@ The pallet contains the following features:-
 - pallet_nft and pallet_xnft
 - Relay-para environment
 - Channel between the para chains
+## For Building Binaries:-
+#### For Relay-Chain Binary:-
+
+Simply  clone the repo provided in the link https://github.com/paritytech/polkadot/tree/release-v0.9.43 and build it by running the command as
+```
+cargo build --release
+```
+#### For the parachain-template-node binary:-
+
+-Simply clone the repo from link https://github.com/substrate-developer-hub/substrate-parachain-template/tree/polkadot-v0.9.40
+
+-You need to add pallets Frame nft and pallet xnft to your parachain node template. For integration of pallets in your chain refer to Step 1 and Step 2 below.
+
+-After adding the pallets to your parachain node template, follow Step 3 provided below
+
+#### For zombinet-linux binary or zombinet-macos binary:-
+
+You can directly download it from the link https://github.com/paritytech/zombienet/releases/
+
+In this way you can build all the three binaries required for the testing enivironment.
+
+After you get all the binaries, Follow step 4 provided below to setup Relay-Para environment.
 #### Steps:-
-1. Add the pallets to your chain. Refer this [guide](https://docs.substrate.io/tutorials/build-application-logic/add-a-pallet/) for help with the integration. 
-2. Add the following snippet to your runtime:
+1. Add the pallets Frame nft and pallet-xnft to your parachain-node-template. Refer this [guide](https://docs.substrate.io/tutorials/build-application-logic/add-a-pallet/) for help with the integration. 
+2. Add the following snippet to your runtime:This is the runtime for pallet-xnft
 ```rust
 impl pallet_xnft::Config for Runtime{
 	type RuntimeEvent = RuntimeEvent;
@@ -29,7 +51,7 @@ impl pallet_xnft::Config for Runtime{
 	type Helper = ();
 }
 ```
-3. Build the repo using the following command:
+3. Build the parachain-node-template repo using the following command:
 ```
 cargo build --release
 ```
